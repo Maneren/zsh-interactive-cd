@@ -7,20 +7,19 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 __zic_fzf_prog() {
-  [ -n "$TMUX_PANE" ] && \
-  [ "${FZF_TMUX:-0}" != 0 ] && \
-  [ ${LINES:-40} -gt 15 ] && \
-  echo "fzf-tmux -d${FZF_TMUX_HEIGHT:-40%}" || echo "fzf"
+  if [[ -n "$TMUX_PANE" && "${FZF_TMUX:-0}" != 0 && ${LINES:-40} -gt 15 ]]; then
+    echo "fzf-tmux -d${FZF_TMUX_HEIGHT:-40%}"
+  else
+    echo "fzf"
+  fi
 }
 
 __zic_calc_lenght() {
-  local length
   if [ "$1" = "/" ]; then
-    length=0
+    echo 0
   else
-    length=$(echo -n "$1" | wc -c)
+    echo $(echo -n "$1" | wc -c)
   fi
-  echo "$length"
 }
 
 __zic_list_subdirs() {
@@ -34,6 +33,7 @@ __zic_list_subdirs() {
 
 __zic_matched_subdir_list() {
   local dir length seg subdirs
+
   if [[ "$1" == */ ]]; then
     dir="$1"
 
@@ -43,61 +43,48 @@ __zic_matched_subdir_list() {
 
     length=$(__zic_calc_lenght "$dir")
 
-    subdirs=$(__zic_list_subdirs "$dir" "${length}")
+    subdirs=($(echo $(__zic_list_subdirs "$dir" "${length}") | xargs -n 1 | sort))
 
-    echo "$subdirs" \
-    | while read -r line; do
-      if [[ "${line[1]}" != "." ]]; then
+    for line ($subdirs); do
+      if [[ "$zic_ignore_dot" == "true" || "${line[1]}" != "." ]]; then
         echo "$line"
       fi
     done
-  else
-    dir=$(dirname -- "$1")
 
-    length=$(__zic_calc_lenght "$dir")
-
-    subdirs=$(__zic_list_subdirs "$dir" "${length}")
-
-    local seg=$(basename -- "$1")
-
-    local starts_with_dir=$(\
-      echo "$subdirs" \
-      | while read -r line; do
-        if [[ "${seg[1]}" != "." && "${line[1]}" == "." ]]; then
-          continue
-        fi
-        if [ "$zic_case_insensitive" = "true" ]; then
-          if [[ "$line:u" == "$seg:u"* ]]; then
-            echo "$line"
-          fi
-        else
-          if [[ "$line" == "$seg"* ]]; then
-            echo "$line"
-          fi
-        fi
-      done
-    )
-
-    if [ -n "$starts_with_dir" ]; then
-      echo "$starts_with_dir"
-    else
-      echo "$subdirs" \
-      | while read -r line; do
-        if [[ "${seg[1]}" != "." && "${line[1]}" == "." ]]; then
-          continue
-        fi
-        if [ "$zic_case_insensitive" = "true" ]; then
-          if [[ "$line:u" == *"$seg:u"* ]]; then
-            echo "$line"
-          fi
-        else
-          if [[ "$line" == *"$seg"* ]]; then
-            echo "$line"
-          fi
-        fi
-      done
-    fi
+    return
   fi
+
+  dir=$(dirname -- "$1")
+
+  length=$(__zic_calc_lenght "$dir")
+
+  subdirs=($(echo $(__zic_list_subdirs "$dir" "${length}") | xargs -n 1 | sort))
+
+  local seg=$(basename -- "$1")
+
+  local starts_with_dir=$(\
+    for line ($subdirs); do
+      if [ "$zic_ignore_dot" == "true" ]; then
+        [[ "$line" =~ "^.?$seg.*$" ]] && echo "$line"
+      else
+        [[ "$line" =~ "^$seg.*$" ]] && echo "$line"
+      fi
+    done
+  )
+
+  if [ -n "$starts_with_dir" ]; then
+    echo "$starts_with_dir"
+    return
+  fi
+
+  for line ($subdirs); do
+    if [[ "$zic_ignore_dot" == "true" || $seg[1] == "." ]]; then
+      [[ "$line" =~ "^.*$seg.*$" ]] && echo "$line"
+      continue
+    fi
+
+    [[ "$line" =~ "^[^\.]*$seg.*$" ]] && echo "$line"
+  done
 }
 
 __zic_fzf_bindings() {
@@ -117,8 +104,13 @@ _zic_list_generator() {
 
 _zic_complete() {
   setopt localoptions nonomatch
+  if [ "$zic_case_insensitive" = "true" ]; then
+    setopt nocasematch
+  fi
+
   local l matches fzf tokens base
 
+  set -x
   l=$(_zic_list_generator $@)
 
   if [ -z "$l" ]; then
