@@ -26,7 +26,7 @@ __zic_list_subdirs() {
   local subdirs=$(\
       find -L "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
       | cut -b $(( ${length} + 2 ))- \
-      | command sed '/^$/d'
+      | command sed '/^$/d' # removes empty lines
   )
   echo "$subdirs"
 }
@@ -62,28 +62,37 @@ __zic_matched_subdir_list() {
 
   local seg=$(basename -- "$1")
 
-  local starts_with_dir=$(\
+  if [ "$zic_case_insensitive" = "true" ]; then
+    setopt nocasematch
+  fi
+
+  local starts_with_seg=$(
+    local regex;
+    if [ "$zic_ignore_dot" == "true" ]; then
+      regex="^\.?$seg.*$"
+    else
+      regex="^$seg.*$"
+    fi
+
     for line ($subdirs); do
-      if [ "$zic_ignore_dot" == "true" ]; then
-        [[ "$line" =~ "^.?$seg.*$" ]] && echo "$line"
-      else
-        [[ "$line" =~ "^$seg.*$" ]] && echo "$line"
-      fi
+      [[ "$line" =~ "$regex" ]] && echo "$line"
     done
   )
 
-  if [ -n "$starts_with_dir" ]; then
-    echo "$starts_with_dir"
+  if [ -n "$starts_with_seg" ]; then
+    echo "$starts_with_seg"
     return
   fi
 
-  for line ($subdirs); do
-    if [[ "$zic_ignore_dot" == "true" || $seg[1] == "." ]]; then
-      [[ "$line" =~ "^.*$seg.*$" ]] && echo "$line"
-      continue
-    fi
+  local regex;
+  if [[ "$zic_ignore_dot" == "true" || $seg[1] == "." ]]; then
+    regex="^.*$seg.*$"
+  else
+    regex="^[^\.].*$seg.*$"
+  fi
 
-    [[ "$line" =~ "^[^\.]*$seg.*$" ]] && echo "$line"
+  for line ($subdirs); do
+    [[ "$line" =~ "$regex" ]] && echo "$line"
   done
 }
 
@@ -99,18 +108,14 @@ __zic_fzf_bindings() {
 }
 
 _zic_list_generator() {
-  __zic_matched_subdir_list "${(Q)@[-1]}" | sort
+  __zic_matched_subdir_list "${(Q)@[-1]}" | sort | uniq
 }
 
 _zic_complete() {
   setopt localoptions nonomatch
-  if [ "$zic_case_insensitive" = "true" ]; then
-    setopt nocasematch
-  fi
 
   local l matches fzf tokens base
 
-  set -x
   l=$(_zic_list_generator $@)
 
   if [ -z "$l" ]; then
@@ -163,18 +168,18 @@ _zic_complete() {
 }
 
 zic-completion() {
+  set -x
   setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
   local tokens cmd
 
   tokens=(${(z)LBUFFER})
   cmd=${tokens[1]}
 
-  if [[ "$LBUFFER" =~ "^\ *cd$" ]]; then
+  local regex='^\ *cd$'
+  if [[ "$cmd" != "cd" || "$LBUFFER" =~ "$regex" ]]; then
     zle ${__zic_default_completion:-expand-or-complete}
-  elif [ "$cmd" = cd ]; then
-    _zic_complete ${tokens[2,${#tokens}]/#\~/$HOME}
   else
-    zle ${__zic_default_completion:-expand-or-complete}
+    _zic_complete ${tokens[2,${#tokens}]/#\~/$HOME}
   fi
 }
 
