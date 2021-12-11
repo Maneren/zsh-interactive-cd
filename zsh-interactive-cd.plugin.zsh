@@ -111,7 +111,7 @@ __zic_fzf_bindings() {
 }
 
 _zic_list_generator() {
-    __zic_matched_subdir_list "${(Q)@[-1]}" | sort | uniq
+    __zic_matched_subdir_list "${(Q)@[-1]}" | sort -fiu
 }
 
 _zic_complete() {
