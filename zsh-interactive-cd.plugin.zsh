@@ -186,10 +186,9 @@ zic-completion() {
     
     local tokens=(${(z)LBUFFER})
     local cmd=${tokens[1]}
-    local input=${tokens[2,${#tokens}]/#\~/"$HOME/"}
+    local input=${tokens[2,${#tokens}]/#\~/"$HOME"}
     
-    local regex='^\ *cd$'
-    if [[ "$cmd" != "cd" || "$LBUFFER" =~ "$regex" ]]; then
+    if [[ "$cmd" != "cd" ]]; then
         zle ${__zic_default_completion:-expand-or-complete}
     else
         _zic_complete $input
