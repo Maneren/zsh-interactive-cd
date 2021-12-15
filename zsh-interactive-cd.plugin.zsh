@@ -25,7 +25,7 @@ __zic_calc_lenght() {
 __zic_list_subdirs() {
     local length=$(__zic_calc_lenght "$1")
     
-    local regex=$2
+    local regex="$2"
     local grep_opts="-E"
     if [ "$zic_case_insensitive" = "true" ]; then
         grep_opts="-iE"
@@ -33,14 +33,14 @@ __zic_list_subdirs() {
     
     # lists subdirs
     # removes base path
-    # removes empty lines
-    # filters by regex
+    # filters by the regex
     local subdirs=$(
-        find -L "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
-        | cut -b $(( ${length} + 2 ))- \
-        | command grep "$grep_opts" "$regex"
+        find -L "$1" -maxdepth 1 -type d 2>/dev/null \
+        | command cut -b $(( ${length} + 2 ))- \
+        | command grep "$grep_opts" "$regex" \
+        | sort
     )
-
+    
     echo "$subdirs"
 }
 
@@ -48,12 +48,13 @@ __zic_matched_subdir_list() {
     if [[ "$1" == */ ]]; then
         local dir="$1"
         
+        # if last char is /, remove it
         if [[ "$dir" != / ]]; then
             dir="${dir: : -1}"
         fi
-
+        
         local regex;
-        if [ "$zic_ignore_dot" == "true" ]; then
+        if [ "$zic_ignore_dot" = "true" ]; then
             regex="^.+$"
         else
             regex="^[^\.].*$"
@@ -66,8 +67,6 @@ __zic_matched_subdir_list() {
     
     local seg=$(basename -- "$1" ) # | sed 's/[^^]/[&]/g; s/\^/\\^/g'
     local dir=$(dirname -- "$1")
-    
-#    local subdirs=($(echo $(__zic_list_subdirs "$dir")))
     
     local starts_with_seg=$(
         local regex;
@@ -89,7 +88,7 @@ __zic_matched_subdir_list() {
     if [[ "$zic_ignore_dot" == "true" || $seg[1] == "." ]]; then
         regex="^.*$seg.*$"
     else
-        regex="^[^\.].*$seg.*$"
+        regex="^[^.].*$seg.*$"
     fi
     
     echo $(__zic_list_subdirs "$dir" "$regex")
@@ -121,19 +120,20 @@ _zic_complete() {
     fi
     
     local fzf=$(__zic_fzf_prog)
-    local fzf_bindings=$zic_fzf_bindings
     
     local match
-    if [ $(echo $list | wc -l) == 1 ]; then
+    # if there is only one match return it
+    # else run fzf
+    if [ $(echo $list | wc -l) = 1 ]; then
         match=${(q)list}
     else
         local fzf_opts="--height ${FZF_TMUX_HEIGHT:-40%} \
             --reverse $FZF_DEFAULT_OPTS $FZF_COMPLETION_OPTS \
-            --bind '${fzf_bindings}'"
+            --bind '$__zic_fzf_bindings_cache'"
         
         # call fzf with $list of options and save the quoted result on single line
         match=$(
-            echo -n ${(q)"$(echo $list | FZF_DEFAULT_OPTS=$fzf_opts ${=fzf})"}
+            echo -n $(echo $list | FZF_DEFAULT_OPTS=$fzf_opts ${=fzf})"}
         )
     fi
     
@@ -142,15 +142,15 @@ _zic_complete() {
         local tokens=(${(z)LBUFFER}) # split LBUFFER into words
         local command="${tokens[1]}"
         local input="${tokens[2]}"
-
+        
         local base="${@}"
-
+        
         # if user enters `path/to/fold` remove the `fold`
         # so `folder` can be just simply appended later
         if [[ "$base" != */ ]]; then
             if [[ "$base" == */* ]]; then
                 base="$(dirname -- "$base")"
-
+                
                 if [[ "${base[-1]}" != / ]]; then
                     base="$base/"
                 fi
@@ -158,11 +158,11 @@ _zic_complete() {
                 base=""
             fi
         fi
-
+        
         # properly format $base
         if [ -n "$base" ]; then
             base="${(q)base}" # add quotes and escapes
-
+            
             # if input path starts with ~, then use the ~ in output
             if [ "${input[1]}" = "~" ]; then
                 base="${base/#$HOME/~}"
@@ -172,7 +172,7 @@ _zic_complete() {
         # append match to LBUFFER (base ends with a `/`)
         LBUFFER="${command} ${base}${match}/"
     fi
-
+    
     zle redisplay
     typeset -f zle-line-init >/dev/null && zle zle-line-init
 }
@@ -204,7 +204,7 @@ zic-completion() {
     unset binding
 }
 
-export zic_fzf_bindings=$(__zic_fzf_bindings)
+export __zic_fzf_bindings_cache=$(__zic_fzf_bindings)
 
 zle -N zic-completion
 if [ -z $zic_custom_binding ]; then
