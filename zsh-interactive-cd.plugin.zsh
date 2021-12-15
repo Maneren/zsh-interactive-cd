@@ -24,43 +24,42 @@ __zic_calc_lenght() {
 
 __zic_list_subdirs() {
     local length=$(__zic_calc_lenght "$1")
-
+    
+    local regex=$2
+    local grep_opts="-E"
+    if [ "$zic_case_insensitive" = "true" ]; then
+        grep_opts="-iE"
+    fi
+    
     # lists subdirs
     # removes base path
     # removes empty lines
+    # filters by regex
     local subdirs=$(
         find -L "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
         | cut -b $(( ${length} + 2 ))- \
-        | command sed '/^$/d'
+        | command grep "$grep_opts" "$regex"
     )
 
     echo "$subdirs"
 }
 
 __zic_matched_subdir_list() {
-    local grep_command="grep -E"
-    if [ "$zic_case_insensitive" = "true" ]; then
-        grep_command="grep -iE"
-    fi
-
-    local subdirs=($(echo $(__zic_list_subdirs "$dir")))
-    
     if [[ "$1" == */ ]]; then
         local dir="$1"
         
         if [[ "$dir" != / ]]; then
             dir="${dir: : -1}"
         fi
-             
 
         local regex;
         if [ "$zic_ignore_dot" == "true" ]; then
-            regex="^.*$"
+            regex="^.+$"
         else
             regex="^[^\.].*$"
         fi
-
-        echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
+        
+        echo $(__zic_list_subdirs "$dir" "$regex")
         
         return
     fi
@@ -68,15 +67,17 @@ __zic_matched_subdir_list() {
     local seg=$(basename -- "$1" ) # | sed 's/[^^]/[&]/g; s/\^/\\^/g'
     local dir=$(dirname -- "$1")
     
+#    local subdirs=($(echo $(__zic_list_subdirs "$dir")))
+    
     local starts_with_seg=$(
         local regex;
-        if [ "$zic_ignore_dot" == "true" ]; then
+        if [ "$zic_ignore_dot" = "true" ]; then
             regex="^\.?$seg.*$"
         else
             regex="^$seg.*$"
         fi
         
-        echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
+        echo $(__zic_list_subdirs "$dir" "$regex")
     )
     
     if [ -n "$starts_with_seg" ]; then
@@ -91,7 +92,7 @@ __zic_matched_subdir_list() {
         regex="^[^\.].*$seg.*$"
     fi
     
-    echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
+    echo $(__zic_list_subdirs "$dir" "$regex")
 }
 
 __zic_fzf_bindings() {
@@ -112,7 +113,7 @@ _zic_list_generator() {
 _zic_complete() {
     setopt localoptions nonomatch
     
-    local list=$(_zic_list_generator $@)
+    local list=$(_zic_list_generator $@ | xargs -n 1)
     
     if [ -z "$list" ]; then
         zle ${__zic_default_completion:-expand-or-complete}
@@ -120,7 +121,7 @@ _zic_complete() {
     fi
     
     local fzf=$(__zic_fzf_prog)
-    local fzf_bindings=$(__zic_fzf_bindings)
+    local fzf_bindings=$zic_fzf_bindings
     
     local match
     if [ $(echo $list | wc -l) == 1 ]; then
@@ -185,7 +186,7 @@ zic-completion() {
     local cmd=${tokens[1]}
     local input=${tokens[2,${#tokens}]/#\~/"$HOME"}
     
-    if [[ "$cmd" != "cd" ]]; then
+    if [ "$cmd" != "cd" ]; then
         zle ${__zic_default_completion:-expand-or-complete}
     else
         _zic_complete $input
@@ -202,6 +203,8 @@ zic-completion() {
     [[ $binding =~ 'undefined-key' ]] || __zic_default_completion=$binding[(s: :w)2]
     unset binding
 }
+
+export zic_fzf_bindings=$(__zic_fzf_bindings)
 
 zle -N zic-completion
 if [ -z $zic_custom_binding ]; then
