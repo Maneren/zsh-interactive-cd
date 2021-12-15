@@ -38,9 +38,12 @@ __zic_list_subdirs() {
 }
 
 __zic_matched_subdir_list() {
+    local grep_command="grep -E"
     if [ "$zic_case_insensitive" = "true" ]; then
-        setopt nocasematch
+        grep_command="grep -iE"
     fi
+
+    local subdirs=($(echo $(__zic_list_subdirs "$dir")))
     
     if [[ "$1" == */ ]]; then
         local dir="$1"
@@ -49,7 +52,6 @@ __zic_matched_subdir_list() {
             dir="${dir: : -1}"
         fi
              
-        local subdirs=($(echo $(__zic_list_subdirs "$dir") | xargs -n 1))
 
         local regex;
         if [ "$zic_ignore_dot" == "true" ]; then
@@ -57,17 +59,14 @@ __zic_matched_subdir_list() {
         else
             regex="^[^\.].*$"
         fi
-        
-        for line ($subdirs); do
-            [[ "$line" =~ "$regex" ]] && echo "$line"
-        done
+
+        echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
         
         return
     fi
     
-    local seg=$(basename -- "$1")
+    local seg=$(basename -- "$1" ) # | sed 's/[^^]/[&]/g; s/\^/\\^/g'
     local dir=$(dirname -- "$1")
-    local subdirs=($(echo $(__zic_list_subdirs "$dir") | xargs -n 1))
     
     local starts_with_seg=$(
         local regex;
@@ -77,9 +76,7 @@ __zic_matched_subdir_list() {
             regex="^$seg.*$"
         fi
         
-        for line ($subdirs); do
-            [[ "$line" =~ "$regex" ]] && echo "$line"
-        done
+        echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
     )
     
     if [ -n "$starts_with_seg" ]; then
@@ -94,9 +91,7 @@ __zic_matched_subdir_list() {
         regex="^[^\.].*$seg.*$"
     fi
     
-    for line ($subdirs); do
-        [[ "$line" =~ "$regex" ]] && echo "$line"
-    done
+    echo "$subdirs" | xargs -n 1 | ${(z)grep_command} "$regex"
 }
 
 __zic_fzf_bindings() {
@@ -182,6 +177,8 @@ _zic_complete() {
 }
 
 zic-completion() {
+    set -x
+
     setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
     
     local tokens=(${(z)LBUFFER})
