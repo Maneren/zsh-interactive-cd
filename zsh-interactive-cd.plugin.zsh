@@ -38,17 +38,17 @@ __zic_list_subdirs() {
         find -L "$1" -maxdepth 1 -type d 2>/dev/null \
         | command cut -b $(( ${length} + 2 ))- \
         | command grep "$grep_opts" "$regex" \
-        | sort
     )
     
     echo "$subdirs"
 }
 
 __zic_matched_subdir_list() {
+    # if ends with /
     if [[ "$1" == */ ]]; then
         local dir="$1"
         
-        # if last char is /, remove it
+        # if $dir isn't just /, remove the traling /
         if [[ "$dir" != / ]]; then
             dir="${dir: : -1}"
         fi
@@ -57,7 +57,7 @@ __zic_matched_subdir_list() {
         if [ "$zic_ignore_dot" = "true" ]; then
             regex="^.+$"
         else
-            regex="^[^\.].*$"
+            regex="^[^.].*$"
         fi
         
         echo $(__zic_list_subdirs "$dir" "$regex")
@@ -71,7 +71,7 @@ __zic_matched_subdir_list() {
     local starts_with_seg=$(
         local regex;
         if [ "$zic_ignore_dot" = "true" ]; then
-            regex="^\.?$seg.*$"
+            regex="^[.]?$seg.*$"
         else
             regex="^$seg.*$"
         fi
@@ -106,13 +106,14 @@ __zic_fzf_bindings() {
 }
 
 _zic_list_generator() {
-    __zic_matched_subdir_list "${(Q)@[-1]}" | sort -fiu
+    echo $(__zic_matched_subdir_list "${(Q)@[-1]}")
 }
 
 _zic_complete() {
+set -x
     setopt localoptions nonomatch
     
-    local list=$(_zic_list_generator $@ | xargs -n 1)
+    local list=$(_zic_list_generator $@ | xargs -n 1 | sort -fiu)
     
     if [ -z "$list" ]; then
         zle ${__zic_default_completion:-expand-or-complete}
@@ -133,7 +134,7 @@ _zic_complete() {
         
         # call fzf with $list of options and save the quoted result on single line
         match=$(
-            echo -n $(echo $list | FZF_DEFAULT_OPTS=$fzf_opts ${=fzf})"}
+            echo -n $(echo $list | FZF_DEFAULT_OPTS=$fzf_opts ${=fzf})
         )
     fi
     
