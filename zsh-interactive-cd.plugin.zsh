@@ -37,7 +37,13 @@ __zic_regex_escape() {
 }
 
 __zic_matched_subdir_list() {
-set -x
+    # constructs a regex and calls __zic_list_subdirs
+    # if input is full path, then then return all subdirs
+    # else try searching for subdirs that start with input
+    # or for those that include the input as substring as a last resort
+
+    # $zic_case_insensitive and $zic_ignore_dot applies to the search
+
     # if ends with /
     if [[ "$1" == */ ]]; then
         local dir="$1"
@@ -59,12 +65,14 @@ set -x
         return
     fi
     
-    # escape characters in the basename to be regex-safe
-    # (can be bypassed, but those chars that can't be in filnames anyway)
     local seg=$(basename -- "$1")
     local dir=$(dirname -- "$1")
+
+    # escape characters in the basename to be regex-safe
+    # (can be bypassed, but with chars that can't be in filnames anyway)
     local escaped=$(__zic_regex_escape $seg)
-    local regex
+
+    local regex # __zic_list_subdirs prepends the regex with ^
 
     if [ "$zic_ignore_dot" = "true" ]; then
         regex="[.]?$escaped"
@@ -178,7 +186,10 @@ zic-completion() {
     local input="${tokens[2,${#tokens}]}"
     input=${input/#\~/$HOME}
     
-    if [ "$cmd" != "cd" ]; then
+    # if the command isn't cd (obviosly)
+    # or if the there is no space after the cd
+    # implying that user wanted to complete the command name rather that path
+    if [[ "$cmd" != "cd" || LBUFFER =~ "^cd$" ]]; then
         zle ${__zic_default_completion:-expand-or-complete}
     else
         _zic_complete $input
