@@ -17,18 +17,19 @@ __zic_calc_lenght() {
 __zic_list_subdirs() {
     local length=$(__zic_calc_lenght "$1")
     
-    local grep_opts
+    local find_opts="-regex"
     if [ "$zic_case_insensitive" = "true" ]; then
-        grep_opts="-i"
+        find_opts="-iregex"
     fi
+
+    local regex="^$(__zic_regex_escape "$1")[/]$2"
     
     # lists subdirs
     # removes base path
     # filters by the regex
     # TODO: experiment with removing the grep and using only `find -regex`
-    find -L "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
-    | command cut -b $(( ${length} + 2 ))- \
-    | command grep "$grep_opts" -E "$2" \
+    find -L "$1" -regextype "posix-extended" -regex "$regex" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
+    | command cut -b $(( ${length} + 2 ))-
 }
 
 __zic_regex_escape() {
@@ -36,6 +37,7 @@ __zic_regex_escape() {
 }
 
 __zic_matched_subdir_list() {
+set -x
     # if ends with /
     if [[ "$1" == */ ]]; then
         local dir="$1"
@@ -47,9 +49,9 @@ __zic_matched_subdir_list() {
         
         local regex;
         if [ "$zic_ignore_dot" = "true" ]; then
-            regex="^.+$"
+            regex=".+"
         else
-            regex="^[^.].*$"
+            regex="[^.].*"
         fi
         
         __zic_list_subdirs "$dir" "$regex"
@@ -65,9 +67,9 @@ __zic_matched_subdir_list() {
     local regex
 
     if [ "$zic_ignore_dot" = "true" ]; then
-        regex="^[.]?$escaped.*$"
+        regex="[.]?$escaped"
     else
-        regex="^$escaped.*$"
+        regex="$escaped"
     fi
 
     local starts_with_seg=$(__zic_list_subdirs "$dir" "$regex")
@@ -81,11 +83,11 @@ __zic_matched_subdir_list() {
     # force starting . in the regex
     if [ "${seg:0:1}" = "." ]; then
         escaped=$(__zic_regex_escape "${seg:1}")
-        regex="^[.].*$escaped.*$"
+        regex="[.].*$escaped"
     elif [ "$zic_ignore_dot" = "true"  ]; then
-        regex="^.*$escaped.*$"
+        regex=".*$escaped"
     else
-        regex="^[^.].*$escaped.*$"
+        regex="^[^.].*$escaped"
     fi
     
     __zic_list_subdirs "$dir" "$regex"
