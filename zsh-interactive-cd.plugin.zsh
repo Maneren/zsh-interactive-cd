@@ -27,8 +27,8 @@ __zic_list_subdirs() {
     # lists subdirs
     # removes base path
     # filters by the regex
-    # TODO: experiment with removing the grep and using only `find -regex`
-    find -L "$1" -regextype "posix-extended" -regex "$regex" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
+    find -L "$1" -regextype "posix-extended" -regex "$regex" \
+        -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
     | command cut -b $(( ${length} + 2 ))-
 }
 
@@ -95,7 +95,7 @@ __zic_matched_subdir_list() {
     elif [ "$zic_ignore_dot" = "true"  ]; then
         regex=".*$escaped"
     else
-        regex="^[^.].*$escaped"
+        regex="[^.].*$escaped"
     fi
     
     __zic_list_subdirs "$dir" "$regex"
