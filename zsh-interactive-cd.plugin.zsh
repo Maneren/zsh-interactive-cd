@@ -184,7 +184,10 @@ zic-completion() {
     local tokens=(${(z)LBUFFER})
     local cmd="${tokens[1]}"
     local input="${tokens[2,${#tokens}]}"
-    input=${input/#\~/$HOME}
+
+    # account for ~ in the path
+    input=${input/#%\~/"$HOME/"} # if $input is only "~"
+    input=${input/#\~/$HOME} # if $input starts with "~"
     
     # if the command isn't cd (obviosly)
     # or if the there is no space after the cd
