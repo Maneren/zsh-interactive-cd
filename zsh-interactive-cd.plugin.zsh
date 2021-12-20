@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 #
-# Copyright 2017-2021 Henry Chang and Maneren
+# Copyright 2017-2018 Henry Chang and 2021 Maneren
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
