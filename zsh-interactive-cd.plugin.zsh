@@ -9,7 +9,7 @@
 zic-completion() {
     set -x
     setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
-    
+
     local tokens=(${(z)LBUFFER})
     local cmd="${tokens[1]}"
         
@@ -73,7 +73,7 @@ _zic_complete() {
 
     match=${match% } # remove trailing space
     [ -n "$match" ] && __zic_show_result "$match"
-    
+
     zle redisplay
     typeset -f zle-line-init >/dev/null && zle zle-line-init
 }
@@ -82,7 +82,7 @@ __zic_show_result() {
     local tokens=(${(z)LBUFFER}) # split LBUFFER into words
     local cmd="${tokens[1]}"
     local input="${tokens[2]}"
-    
+
     local base="$input"
     
     # if user enters 'path/to/fold' remove the 'fold'
@@ -111,14 +111,14 @@ __zic_matched_subdir_list() {
     # if ends with /
     [[ "$1" == */ ]] && {
         local dir="$1"
-        
+
         # if $dir isn't just /, remove the traling /
         [ "$dir" != / ] && dir="${dir:0:-1}"
         
-        [ "$zic_ignore_dot" = "true" ] && regex="." || regex="[^.]"
+        regex=$([ "$zic_ignore_dot" = "true" ] && echo "." || echo "[^.]")
         
         __zic_list_subdirs "$dir" "$regex"
-        
+
         return
     }
     
@@ -149,14 +149,16 @@ __zic_matched_subdir_list() {
     else
         regex="[^.].*$escaped"
     fi
-    
+
     __zic_list_subdirs "$dir" "$regex"
 }
 
 __zic_fzf_bindings() {
     autoload is-at-least
+    
     local version=$(fzf --version)
     local optional=$(is-at-least '0.21.0' $version && echo ',bspace:backward-delete-char/eof')
+
     echo "shift-tab:up,tab:down${optional}"
 }
 
@@ -170,7 +172,7 @@ __zic_list_subdirs() {
     
     local escaped=$([ "$base" != "/" ] && __zic_regex_escape "$base")
     local regex="^${escaped}[/]$2.*$"
-    
+
     # lists subdirs
     # removes base path
     # filters by the regex
