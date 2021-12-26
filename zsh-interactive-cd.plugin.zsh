@@ -7,7 +7,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 zic-completion() {
-    set -x
     setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
 
     local tokens=(${(z)LBUFFER})
