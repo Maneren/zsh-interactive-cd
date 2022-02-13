@@ -15,10 +15,11 @@ zic-completion() {
     # if the command isn't cd (obviosly)
     # or if the there is no space after the cd
     # implying that user wanted to complete the command name rather that path
-    if [[ "$cmd" != "cd" || LBUFFER =~ "^cd$" ]]; then
+    [[ "$cmd" != "cd" || LBUFFER =~ "^cd$" ]] && {
         zle ${__zic_default_completion:-expand-or-complete}
         return
-    fi
+    }
+
     local input="${tokens[2,${#tokens}]}"
 
     # account for special inputs
@@ -41,9 +42,7 @@ zic-completion() {
 }
 
 zle -N zic-completion
-if [ -z $zic_custom_binding ]; then
-    zic_custom_binding='^I'
-fi
+[ -z $zic_custom_binding ] && zic_custom_binding='^I'
 bindkey "${zic_custom_binding}" zic-completion
 
 #################
