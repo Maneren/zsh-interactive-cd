@@ -54,8 +54,16 @@ bindkey "${zic_custom_binding:-"^I"}" zic-completion
 
 _zic_complete() {
     setopt localoptions nonomatch
-    
-    local list=$(__zic_matched_subdir_list "${(Q)1}" | xargs -n 1 | sort -fiu)
+
+    local start=$(date +%s%3N)
+
+    local list=$(__zic_matched_subdir_list ${(Q)1} | xargs -n 1 | sort -fiu)
+
+    local end=$(date +%s%3N)
+
+    echo Took $(($end-$start)) ns
+
+    return
     
     [ -z "$list" ] && {
         zle $__zic_default_completion
