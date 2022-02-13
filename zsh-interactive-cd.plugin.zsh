@@ -7,20 +7,22 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 zic-completion() {
-    setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
+setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
 
-    local tokens=(${(z)LBUFFER})
-    local cmd="${tokens[1]}"
+local tokens=(${(z)LBUFFER})
+local cmd="${tokens[1]}"
 
-    # if the command isn't cd (obviosly)
+    # if the command isn't cd
     # or if the there is no space after the cd
-    # implying that user wanted to complete the command name rather that path
+    # implying that user wanted to complete
+    # the command name rather that path
+    # then use ZSH's default completion
     [[ "$cmd" != "cd" || LBUFFER =~ "^cd$" ]] && {
-        zle ${__zic_default_completion:-expand-or-complete}
-        return
-    }
+      zle $__zic_default_completion
+          return
+        }
 
-    local input="${tokens[2,${#tokens}]}"
+      local input="${tokens[2,${#tokens}]}"
 
     # account for special inputs
     input=${input/#%\~/"$HOME/"} # if $input is only "~"
@@ -28,17 +30,19 @@ zic-completion() {
     input=${input/#./"./."} # if $input starts with "."
 
     _zic_complete $input
-}
+  }
 
 [ -z "$__zic_default_completion" ] && {
-    binding=$(bindkey '^I')
-    # $binding[(s: :w)2]
-    # The command substitution and following word splitting to determine the
-    # default zle widget for ^I formerly only works if the IFS parameter contains
-    # a space via $binding[(w)2]. Now it specifically splits at spaces, regardless
-    # of IFS.
-    [[ $binding =~ 'undefined-key' ]] || __zic_default_completion=$binding[(s: :w)2]
-    unset binding
+  __binding=$(bindkey '^I') # TAB key binding
+  # if the key isn't bound to anything use ZSH the default completion
+  # else use the set completion
+  __zic_default_completion=$(
+  [[ $__binding =~ 'undefined-key' ]] \
+    && echo "expand-or-complete" \
+    || echo $__binding[(s: :w)2]
+  )
+
+  unset __binding
 }
 
 zle -N zic-completion
@@ -50,60 +54,63 @@ bindkey "${zic_custom_binding}" zic-completion
 #################
 
 _zic_complete() {
-    setopt localoptions nonomatch
+  setopt localoptions nonomatch
 
-    local list=$(__zic_matched_subdir_list "${(Q)@[-1]}" | xargs -n 1 | sort -fiu)
+  local start=$(date +%s%3N)
 
-    [ -z "$list" ] && {
-        zle ${__zic_default_completion:-expand-or-complete}
-        return
+  local list=$(__zic_matched_subdir_list ${(Q)1} | xargs -n 1 | sort -fiu)
+
+  local end=$(date +%s%3N)
+
+  echo Took $(($end-$start)) ns
+
+  return
+
+  [ -z "$list" ] && {
+    zle $__zic_default_completion
+      return
     }
 
-    local match
     # if there is only one match return it
     # else run fzf
-    [ $(wc -l <<< "$list") = 1 ] && {
-        match="${(q)list}"
-    } || {
-        local fzf_opts="--height 40% --reverse \
-            --bind '$(__zic_fzf_bindings)' $FZF_DEFAULT_OPTS"
-
-        # call fzf with $list of options
-        match=$(FZF_DEFAULT_OPTS=$fzf_opts fzf <<< "$list")
-    }
+    local match=$(
+    [ $(wc -l <<< "$list") = 1 ] \
+      && echo "${(q)list}" \
+      || fzf --height "40%" --reverse --bind $(__zic_fzf_bindings) <<< "$list"
+    )
 
     match=${match% } # remove trailing space
     [ -n "$match" ] && __zic_show_result "$match"
 
     zle redisplay
     typeset -f zle-line-init >/dev/null && zle zle-line-init
-}
+  }
 
 __zic_show_result() {
-    local tokens=(${(z)LBUFFER}) # split LBUFFER into words
-    local cmd="${tokens[1]}"
-    local input="${tokens[2]}"
+  local tokens=(${(z)LBUFFER}) # split LBUFFER into words
+  local cmd="${tokens[1]}"
+  local input="${tokens[2]}"
 
-    local base="$input"
+  local base="$input"
 
-    # if user enters `path/to/fold` remove the `fold`
-    # so `folder` can be just simply appended later
-    [[ "$base" != */ ]] && {
-        [[ "$base" == */* ]] && base="$(dirname -- "$base")/" || base=""
-    }
+    # if user enters 'path/to/fold' remove the 'fold'
+    # so 'folder' can be just simply appended later
+    [[ "$base" != */ ]] && base=$([[ "$base" == */* ]] && echo "$(dirname -- "$base")/")
+
 
     [ -n "$base" ] && base="${(q)base}" # add quotes if needed and escape chars
+
     base="${base/#'\~'/~}" # unescape starting tilde
 
-    # append match to LBUFFER (base always ends with a `/`)
+    # append match to LBUFFER (base always ends with a '/')
     LBUFFER="${cmd} ${base}${match}/"
-}
+  }
 
 __zic_matched_subdir_list() {
-    # constructs a regex and calls __zic_list_subdirs
-    # if input is full path, then then return all subdirs
-    # else try searching for subdirs that start with input
-    # or for those that include the input as substring as a last resort
+  # constructs a regex and calls __zic_list_subdirs
+  # if input is full path, then then return all subdirs
+  # else try searching for subdirs that start with input
+  # or for those that include the input as substring as a last resort
 
     # $zic_case_insensitive and $zic_ignore_dot applies to the search
 
@@ -111,17 +118,17 @@ __zic_matched_subdir_list() {
 
     # if ends with /
     [[ "$1" == */ ]] && {
-        local dir="$1"
+      local dir="$1"
 
         # if $dir isn't just /, remove the traling /
         [ "$dir" != / ] && dir="${dir:0:-1}"
 
-        [ "$zic_ignore_dot" = "true" ] && regex="." || regex="[^.]"
+        regex=$([ "$zic_ignore_dot" = "true" ] && echo "." || echo "[^.]")
 
         __zic_list_subdirs "$dir" "$regex"
 
         return
-    }
+      }
 
     local seg=$(basename -- "$1")
     local dir=$(dirname -- "$1")
@@ -130,64 +137,62 @@ __zic_matched_subdir_list() {
     # (can be bypassed, but with chars that can't be in filnames anyway)
     local escaped=$(__zic_regex_escape $seg)
 
-    regex="$escaped"
-    [ "$zic_ignore_dot" = "true" ] && regex="[.]?$escaped"
+
+    regex=$([ "$zic_ignore_dot" = "true" ] && echo "[.]?$escaped" || echo "$escaped")
 
     local starts_with_seg=$(__zic_list_subdirs "$dir" "$regex")
 
     [ -n "$starts_with_seg" ] && {
-        echo "$starts_with_seg"
-        return
-    }
+      echo "$starts_with_seg"
+          return
+        }
 
     # if first character of input ($1) is .,
     # force starting . in the regex
-    if [ "${seg:0:1}" = "." ]; then
-        escaped=$(__zic_regex_escape "${seg:1}")
-        regex="[.].*$escaped"
+    if [ "${seg[1]}" = "." ]; then
+      escaped=$(__zic_regex_escape "${seg:1}")
+      regex="[.].*$escaped"
     elif [ "$zic_ignore_dot" = "true"  ]; then
-        regex=".*$escaped"
+      regex=".*$escaped"
     else
-        regex="[^.].*$escaped"
+      regex="[^.].*$escaped"
     fi
 
     __zic_list_subdirs "$dir" "$regex"
-}
+  }
 
 __zic_fzf_bindings() {
-    autoload is-at-least
+  autoload is-at-least
 
-    is-at-least '0.21.0' $(fzf --version) && {
-        echo 'shift-tab:up,tab:down,bspace:backward-delete-char/eof'
-    } || {
-        echo 'shift-tab:up,tab:down'
-    }
+  local version=$(fzf --version)
+  local optional=$(is-at-least '0.21.0' $version && echo ',bspace:backward-delete-char/eof')
+
+  echo "shift-tab:up,tab:down${optional}"
 }
 
 __zic_list_subdirs() {
-    local base="$1"
-    local length=$(__zic_calc_lenght "$base")
+  local base="$1"
+  local length=$(__zic_calc_lenght "$base")
 
-    local find_opt="-regex"
-    [ "$zic_case_insensitive" = "true" ] && find_opt="-iregex"
+  local find_opts=$(
+  [ "$zic_case_insensitive" = "true" ] && echo "-iregex" || echo "-regex"
+)
 
-    local escaped
-    [ "$base" != "/" ] && escaped=$(__zic_regex_escape "$base")
-
-    local regex="^${escaped}[/]$2.*$"
+local escaped=$([ "$base" != "/" ] && __zic_regex_escape "$base")
+local regex="^${escaped}[/]$2.*$"
 
     # lists subdirs
     # removes base path
     # filters by the regex
-    find -L "$base" -regextype "posix-extended" $find_opt "$regex" \
-        -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
-    | command cut -b $(( ${length} + 2 ))-
-}
+    find -L "$base" -regextype "posix-extended" $find_opts "$regex" \
+      -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
+      | command cut -b $(( ${length} + 2 ))-
+    }
 
-__zic_regex_escape() {
+  __zic_regex_escape() {
     sed 's/[^^]/[&]/g; s/\^/\\^/g' <<< "$1"
-}
+  }
 
 __zic_calc_lenght() {
-    [ "$1" = "/" ] && echo 0 || { echo -n "$1" | wc -c }
+  [ "$1" = "/" ] && echo 0 || { printf "$1" | wc -c }
 }
