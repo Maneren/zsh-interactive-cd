@@ -62,7 +62,7 @@ _zic_complete() {
 
   local end=$(date +%s%3N)
 
-  echo Took $(($end-$start)) ns
+  echo Took $(($end-$start)) ms
 
   return
 
