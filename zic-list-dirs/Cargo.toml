@@ -1,5 +1,5 @@
 [package]
-name = "list-dirs"
+name = "zic-list-dirs"
 version = "0.1.0"
 edition = "2021"
 

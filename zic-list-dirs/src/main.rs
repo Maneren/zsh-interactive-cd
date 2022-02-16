@@ -7,7 +7,6 @@ use std::{
   io::{self, Cursor},
   path::Path,
   process,
-  time::Instant,
 };
 
 use regex::Regex;
@@ -37,15 +36,10 @@ fn main() {
 
   let input = tokens.next().unwrap_or_default();
 
-  let start = Instant::now();
-
   let entries = match list_files(input) {
     Ok(entries) => entries,
     _ => return backup(),
   };
-
-  let elapsed = start.elapsed();
-  eprint!("{elapsed:?}");
 
   let result = match entries.len() {
     0 => return backup(),
