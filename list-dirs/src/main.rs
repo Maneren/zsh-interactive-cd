@@ -7,6 +7,7 @@ use std::{
   io::{self, Cursor},
   path::Path,
   process,
+  time::Instant,
 };
 
 use regex::Regex;
@@ -19,7 +20,7 @@ use skim::{
 fn main() {
   let lbuffer = env::args().nth(1).unwrap_or_default();
 
-  if lbuffer == "cd" {
+  if lbuffer.ends_with("cd") {
     backup();
   };
 
@@ -36,18 +37,18 @@ fn main() {
 
   let input = tokens.next().unwrap_or_default();
 
-  // let start = Instant::now();
+  let start = Instant::now();
 
   let entries = match list_files(input) {
     Ok(entries) => entries,
     _ => return backup(),
   };
 
-  // let elapsed = start.elapsed();
-  // eprint!("{elapsed:?}");
+  let elapsed = start.elapsed();
+  eprint!("{elapsed:?}");
 
   let result = match entries.len() {
-    // 0 => return backup(),
+    0 => return backup(),
     1 => entries[0].clone(),
     _ => skim(entries.join("\n")),
   };
@@ -61,25 +62,21 @@ fn main() {
 fn format_result(input: &str, result: &str) -> String {
   // if user enters 'path/to/fold' remove the 'fold'
   // so 'folder' can be just simply appended later
-  let base = if input.ends_with('/') {
-    input
-  } else {
-    let mut base = input.rsplit_once('/').unwrap_or(("", "")).0;
 
-    if base.is_empty() {
-      base = "/";
-    }
-
-    base
-  };
+  let base = input
+    .chars()
+    .rev()
+    .skip_while(|ch| ch != &'/')
+    .collect::<String>()
+    .chars()
+    .rev()
+    .collect::<String>();
 
   let result = escape(Cow::Borrowed(result)).to_string();
 
   if base.is_empty() {
     format!("{result}/")
   } else {
-    let base = escape(Cow::Borrowed(base)).to_string().replace("'~'", "~");
-
     format!("{base}{result}/")
   }
 }
@@ -178,7 +175,9 @@ fn list_files(input: &str) -> io::Result<Vec<String>> {
     regex = format!("[^.].*{escaped}");
   }
 
-  list_subdirs(dir, &regex)
+  let list = list_subdirs(dir, &regex);
+
+  list
 }
 
 fn list_subdirs(base: &str, regex: &str) -> io::Result<Vec<String>> {
