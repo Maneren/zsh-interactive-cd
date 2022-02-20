@@ -17,34 +17,50 @@ use skim::{
 };
 
 fn main() {
-  let lbuffer = env::args().nth(1).unwrap_or_default();
+  let mut args = env::args();
+  args.next(); // skip first argument
 
-  if lbuffer.ends_with("cd") {
-    backup();
-  };
+  let lbuffer = args.next().unwrap_or_default();
+  let lbuffer_expanded = args.next().unwrap_or_default();
+
+  eprintln!("lbuffer: {lbuffer}");
+  eprintln!("lbuffer_expanded: {lbuffer_expanded}");
 
   let mut tokens = lbuffer.split_whitespace();
+  let mut tokens_expanded = lbuffer_expanded.split_whitespace();
 
   let cmd = match tokens.next() {
     Some(cmd) => cmd,
-    _ => return backup(),
+    _ => backup(),
   };
+
+  eprintln!("cmd: {cmd}");
 
   if cmd != "cd" {
     backup();
   }
 
   let input = tokens.next().unwrap_or_default();
+  let input_path = tokens_expanded.next().unwrap_or_default();
 
-  let entries = match list_files(input) {
+  eprintln!("input: {input}");
+  eprintln!("input_path: {input_path}");
+
+  let entries = match list_files(input_path) {
     Ok(entries) => entries,
-    _ => return backup(),
+    _ => backup(),
   };
 
   let result = match entries.len() {
-    0 => return backup(),
+    0 => backup(),
     1 => entries[0].clone(),
-    _ => skim(entries.join("\n")),
+    _ => {
+      let entries = entries.join("\n");
+
+      eprintln!("{entries:?}");
+
+      skim(entries)
+    }
   };
 
   let result = format_result(input, &result);
@@ -96,7 +112,8 @@ fn skim(input: String) -> String {
   selected_items.get(0).unwrap().text().into_owned()
 }
 
-fn backup() {
+fn backup() -> ! {
+  eprintln!("error");
   process::exit(1);
 }
 
@@ -112,10 +129,8 @@ fn list_files(input: &str) -> io::Result<Vec<String>> {
 
   let ignore_dot = env::var("zic_ignore_dot") == Ok("true".to_string());
 
-  let input = input.replace('~', &env::var("HOME").unwrap());
-
   let input = if input.starts_with('/') {
-    input
+    input.to_string()
   } else {
     let current = env::current_dir()
       .expect("current dir error")
@@ -169,9 +184,7 @@ fn list_files(input: &str) -> io::Result<Vec<String>> {
     regex = format!("[^.].*{escaped}");
   }
 
-  let list = list_subdirs(dir, &regex);
-
-  list
+  list_subdirs(dir, &regex)
 }
 
 fn list_subdirs(base: &str, regex: &str) -> io::Result<Vec<String>> {
