@@ -7,7 +7,6 @@ use std::{
   io::{self, Cursor},
   path::Path,
   process,
-  time::Instant,
 };
 
 use regex::Regex;
@@ -18,15 +17,11 @@ use skim::{
 };
 
 fn main() {
-  let start = Instant::now();
   let mut args = env::args();
   args.next(); // skip first argument
 
   let lbuffer = args.next().unwrap_or_default();
   let lbuffer_expanded = args.next().unwrap_or_default();
-
-  eprintln!("lbuffer: {lbuffer}");
-  eprintln!("lbuffer_expanded: {lbuffer_expanded}");
 
   let mut tokens = lbuffer.split_whitespace();
   let mut tokens_expanded = lbuffer_expanded.split_whitespace();
@@ -36,17 +31,12 @@ fn main() {
     _ => backup(),
   };
 
-  eprintln!("cmd: {cmd}");
-
   if cmd != "cd" {
     backup();
   }
 
   let input = tokens.next().unwrap_or_default();
   let input_path = tokens_expanded.nth(1).unwrap_or_default();
-
-  eprintln!("input: {input}");
-  eprintln!("input_path: {input_path}");
 
   if input == "~" {
     print!("cd ~/");
@@ -64,32 +54,20 @@ fn main() {
     _ => backup(),
   };
 
-  let elapsed = start.elapsed();
-  eprintln!("{elapsed:?}");
-
   let result = match entries.len() {
     0 => backup(),
     1 => entries[0].clone(),
-    _ => {
-      let entries = entries.join("\n");
-
-      eprintln!("{entries:?}");
-
-      skim(entries)
-    }
+    _ => skim(entries.join("\n")),
   };
 
   let result = format_result(input, &result);
 
-  print!("cd {result}");
+  print!("cd {result}"); // main output
 
   process::exit(0);
 }
 
 fn format_result(input: &str, result: &str) -> String {
-  // if user enters 'path/to/fold' remove the 'fold'
-  // so 'folder' can be just simply appended later
-
   let base = input
     .chars()
     .rev()
@@ -97,7 +75,7 @@ fn format_result(input: &str, result: &str) -> String {
     .collect::<String>()
     .chars()
     .rev()
-    .collect::<String>();
+    .collect::<String>(); // without the last part `path/to/fold` -> 'path/to`
 
   let result = escape(Cow::Borrowed(result)).to_string();
 
@@ -116,12 +94,9 @@ fn skim(input: String) -> String {
     .build()
     .unwrap();
 
-  // `SkimItemReader` is a helper to turn any `BufRead` into a stream of `SkimItem`
-  // `SkimItem` was implemented for `AsRef<str>` by default
   let item_reader = SkimItemReader::default();
   let items = item_reader.of_bufread(Cursor::new(input));
 
-  // `run_with` would read and show items from the stream
   let source = Some(items);
   let selected_items =
     Skim::run_with(&options, source).map_or_else(Vec::new, |out| out.selected_items);
@@ -130,13 +105,12 @@ fn skim(input: String) -> String {
 }
 
 fn backup() -> ! {
-  eprintln!("error");
   process::exit(1);
 }
 
 fn list_files(input: &str) -> io::Result<Vec<String>> {
-  //  constructs a regex and calls list_subdirs
-  //  if input is full path, then then return all subdirs
+  // constructs a regex and calls list_subdirs
+  // if input is full path, then then return all subdirs
   // else try searching for subdirs that start with input
   // or for those that include the input as substring as a last resort
 
