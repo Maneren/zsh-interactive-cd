@@ -53,7 +53,11 @@ fn main() {
     process::exit(0);
   }
 
-  let input_path = input_path.replace("~", &env::var("HOME").unwrap_or_default());
+  let input_path = if input_path.starts_with('~') {
+    input_path.replace('~', &env::var("HOME").unwrap_or_default())
+  } else {
+    input_path.to_string()
+  };
 
   let entries = match list_files(&input_path) {
     Ok(entries) => entries,
