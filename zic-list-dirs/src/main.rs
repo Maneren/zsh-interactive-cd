@@ -7,6 +7,7 @@ use std::{
   io::{self, Cursor},
   path::Path,
   process,
+  time::Instant,
 };
 
 use regex::Regex;
@@ -17,6 +18,7 @@ use skim::{
 };
 
 fn main() {
+  let start = Instant::now();
   let mut args = env::args();
   args.next(); // skip first argument
 
@@ -41,15 +43,25 @@ fn main() {
   }
 
   let input = tokens.next().unwrap_or_default();
-  let input_path = tokens_expanded.next().unwrap_or_default();
+  let input_path = tokens_expanded.nth(1).unwrap_or_default();
 
   eprintln!("input: {input}");
   eprintln!("input_path: {input_path}");
 
-  let entries = match list_files(input_path) {
+  if input == "~" {
+    print!("cd ~/");
+    process::exit(0);
+  }
+
+  let input_path = input_path.replace("~", &env::var("HOME").unwrap_or_default());
+
+  let entries = match list_files(&input_path) {
     Ok(entries) => entries,
     _ => backup(),
   };
+
+  let elapsed = start.elapsed();
+  eprintln!("{elapsed:?}");
 
   let result = match entries.len() {
     0 => backup(),
@@ -64,6 +76,7 @@ fn main() {
   };
 
   let result = format_result(input, &result);
+
   print!("cd {result}");
 
   process::exit(0);
