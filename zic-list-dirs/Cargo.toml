@@ -1,0 +1,9 @@
+[package]
+name = "zic-list-dirs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = "1.5.4"
+skim = "0.9.4"
+shell-escape = "0.1.5"
