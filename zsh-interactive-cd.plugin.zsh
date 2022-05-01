@@ -11,6 +11,7 @@ function zic-completion() {
   output=$(zic-list-dirs "$LBUFFER" "${(e)LBUFFER}") # second argument is with expanded variables
   
   if [ ! $? = 0 ]; then
+
     zle $__zic_default_completion
     return
   fi
