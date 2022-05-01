@@ -212,7 +212,7 @@ fn list_subdirs(base: &str, regex: &str) -> io::Result<Vec<String>> {
     match (a_dot, b_dot) {
       (true, false) => Ordering::Greater,
       (false, true) => Ordering::Less,
-      _ => Ordering::Equal,
+      _ => a.cmp(b),
     }
   });
 
