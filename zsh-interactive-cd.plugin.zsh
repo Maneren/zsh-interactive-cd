@@ -24,26 +24,23 @@ function zic-completion() {
 
 PATH="$PATH:${0:a:h}/bin"
 
-if which zic-list-dirs 2>&1 >/dev/null; then
-  [ -z $zic_custom_binding ] && zic_custom_binding='^I' # default is TAB
-  
-  [ -z $__zic_default_completion ] && {
-    __binding=$(bindkey $zic_custom_binding)
-    # if the key isn't bound to anything use ZSH's default completion
-    # else use the set completion
-    __zic_default_completion=$(
-      [ $__binding = 'undefined-key' ] \
-      && echo "expand-or-complete" \
-      || echo $__binding[(s: :w)2]
-    )
-    
-    unset __binding
-  }
-  
-  zle -N zic-completion
-  bindkey $zic_custom_binding zic-completion
-else
+if ! which zic-list-dirs 2>&1 >/dev/null; then
   echo "zsh-interactive-cd: Binary not found" >&2
   return 1
 fi
 
+[ -z $zic_custom_binding ] && zic_custom_binding='^I' # default is TAB
+
+[ -z $__zic_default_completion ] && {
+  __binding=$(bindkey $zic_custom_binding)
+  # if the key isn't bound to anything use ZSH's default completion
+  # else use the set completion
+  __zic_default_completion=$(
+    [ $__binding = 'undefined-key' ] && echo "expand-or-complete" || echo $__binding[(s: :w)2]
+  )
+  
+  unset __binding
+}
+
+zle -N zic-completion
+bindkey $zic_custom_binding zic-completion
