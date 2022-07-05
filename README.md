@@ -6,7 +6,7 @@
 
 ## Installation
 
-Requires `cargo`
+Requires `cargo` (install via [`rustup`](https://rustup.rs/))
 
 ### zinit
 

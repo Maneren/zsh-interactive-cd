@@ -9,12 +9,17 @@ use std::{
   process,
 };
 
-use regex::Regex;
+use regex::RegexBuilder;
 use shell_escape::escape;
 use skim::{
-  prelude::{SkimItemReader, SkimOptionsBuilder},
+  prelude::{Key, SkimItemReader, SkimOptionsBuilder},
   Skim,
 };
+
+struct Options {
+  case_insensitive: bool,
+  ignore_dot: bool,
+}
 
 fn main() {
   let mut args = env::args();
@@ -23,211 +28,339 @@ fn main() {
   let lbuffer = args.next().unwrap_or_default();
   let lbuffer_expanded = args.next().unwrap_or_default();
 
-  let mut tokens = lbuffer.split_whitespace();
-  let mut tokens_expanded = lbuffer_expanded.split_whitespace();
+  let (command, input) = lbuffer.split_once(' ').unwrap_or_default();
+  let (_, input_path) = lbuffer_expanded.split_once(' ').unwrap_or_default();
 
-  let cmd = match tokens.next() {
-    Some(cmd) => cmd,
-    _ => backup(),
+  match command {
+    "cd" => {}
+    _ => abort(),
+  }
+
+  let options = Options {
+    case_insensitive: env::var("zic_case_insensitive") == Ok("true".to_string()),
+    ignore_dot: env::var("zic_ignore_dot") == Ok("true".to_string()),
   };
 
-  if cmd != "cd" {
-    backup();
-  }
-
-  let input = tokens.next().unwrap_or_default();
-  let input_path = tokens_expanded.nth(1).unwrap_or_default();
-
-  if input == "~" {
-    print!("cd ~/");
-    process::exit(0);
-  }
-
-  let input_path = if input_path.starts_with('~') {
+  let input_path = if input_path.starts_with("~/") {
     input_path.replace('~', &env::var("HOME").unwrap_or_default())
   } else {
     input_path.to_string()
   };
 
-  let entries = match list_files(&input_path) {
-    Ok(entries) => entries,
-    _ => backup(),
-  };
+  let (base_path, search_term) = parse_path(&input_path);
 
-  let result = match entries.len() {
-    0 => backup(),
-    1 => entries[0].clone(),
-    _ => skim(entries.join("\n")),
-  };
-
-  let result = format_result(input, &result);
-
-  print!("cd {result}"); // main output
-
-  process::exit(0);
-}
-
-fn format_result(input: &str, result: &str) -> String {
-  let base = input
-    .chars()
-    .rev()
-    .skip_while(|ch| ch != &'/')
-    .collect::<String>()
-    .chars()
-    .rev()
-    .collect::<String>(); // without the last part `path/to/fold` -> 'path/to`
-
-  let result = escape(Cow::Borrowed(result)).to_string();
-
-  if base.is_empty() {
-    format!("{result}/")
+  let base_path = if base_path.is_empty() {
+    ".".into()
   } else {
-    format!("{base}{result}/")
+    base_path
+  };
+
+  let path = Path::new(&base_path);
+  let base_path = path
+    .canonicalize()
+    .unwrap_or_else(|_| abort())
+    .to_string_lossy()
+    .to_string();
+
+  let subdirs = match get_subdirs(&base_path) {
+    Ok(entries) => entries,
+    _ => abort(),
+  };
+
+  let filtered = filter_dir_list(&search_term, &options, &subdirs);
+
+  let result = match &filtered[..] {
+    [] => {
+      eprint!("\x07"); // ring a bell
+      print!("cd {input}");
+      exit();
+    }
+    [entry] => Some(entry.clone()),
+    _ => {
+      let mut sorted = filtered;
+
+      // sort hidden files in front
+      sorted.sort_unstable_by(|a, b| {
+        let a_dot = a.starts_with('.');
+        let b_dot = b.starts_with('.');
+
+        match (a_dot, b_dot) {
+          (true, false) => Ordering::Greater,
+          (false, true) => Ordering::Less,
+          _ => a.cmp(b),
+        }
+      });
+
+      skim(sorted.join("\n"))
+    }
+  };
+
+  if let Some(result) = result {
+    let (base_path, _) = parse_path(input);
+
+    let result = format_result(&base_path, &result);
+
+    print!("cd {result}"); // main output
+  } else {
+    print!("cd {input}"); // nothing was chosen
   }
 }
 
-fn skim(input: String) -> String {
+fn parse_path(input_path: &str) -> (String, String) {
+  if let Some((base, search)) = input_path.rsplit_once('/') {
+    (format!("{base}/"), search.into())
+  } else {
+    ("".into(), input_path.into())
+  }
+}
+
+fn exit() -> ! {
+  process::exit(0);
+}
+
+fn abort() -> ! {
+  process::exit(1);
+}
+
+fn get_subdirs(path: &String) -> io::Result<Vec<String>> {
+  let mut subdirs = Vec::new();
+  for entry in fs::read_dir(Path::new(path))? {
+    let entry = entry?;
+    let path = entry.path();
+    if path.is_dir() {
+      subdirs.push(path.file_name().unwrap().to_string_lossy().to_string());
+    }
+  }
+  Ok(subdirs)
+}
+
+fn format_result(base: &str, result: &str) -> String {
+  let result = escape(Cow::Borrowed(result)).to_string();
+
+  format!("{}{}/", base, result) // base always ends with '/'
+}
+
+fn skim(input: String) -> Option<String> {
   let options = SkimOptionsBuilder::default()
     .height(Some("50%"))
     .multi(false)
     .reverse(true)
+    .bind(vec!["esc:abort"])
     .build()
     .unwrap();
 
-  let item_reader = SkimItemReader::default();
-  let items = item_reader.of_bufread(Cursor::new(input));
+  let items = SkimItemReader::default().of_bufread(Cursor::new(input));
 
-  let source = Some(items);
-  let selected_items =
-    Skim::run_with(&options, source).map_or_else(Vec::new, |out| out.selected_items);
+  let output = Skim::run_with(&options, Some(items)).expect("Failed to run Skim");
 
-  selected_items.get(0).unwrap().text().into_owned()
+  match output.final_key {
+    Key::Enter => output
+      .selected_items
+      .first()
+      .map(|item| item.text().into_owned()),
+    _ => None,
+  }
 }
 
-fn backup() -> ! {
-  process::exit(1);
-}
-
-fn list_files(input: &str) -> io::Result<Vec<String>> {
-  // constructs a regex and calls list_subdirs
-  // if input is full path, then then return all subdirs
-  // else try searching for subdirs that start with input
-  // or for those that include the input as substring as a last resort
-
-  // list_subdirs prefixes with '^' and suffixes with '.*$'
-
+fn filter_dir_list(search_term: &str, options: &Options, subdirs: &[String]) -> Vec<String> {
+  // constructs a regex and calls the inner function
+  // which prefixes it with '^' and suffixes with '.*$'
   // $zic_case_insensitive and $zic_ignore_dot applies to the search
 
-  let ignore_dot = env::var("zic_ignore_dot") == Ok("true".to_string());
-
-  let input = if input.starts_with('/') {
-    input.to_string()
-  } else {
-    let current = env::current_dir()
-      .expect("current dir error")
-      .to_str()
-      .unwrap()
-      .to_owned();
-
-    format!("{current}/{input}")
-  };
-
-  // if ends with /
-  if input.ends_with('/') {
-    let regex = if ignore_dot { "." } else { "[^.]" };
-    return list_subdirs(&input, regex);
+  if search_term.is_empty() {
+    return if options.ignore_dot {
+      subdirs.to_vec()
+    } else {
+      subdirs
+        .iter()
+        .filter(|dir| !dir.starts_with('.'))
+        .cloned()
+        .collect()
+    };
   }
 
-  let (mut base, seg) = input.rsplit_once('/').unwrap_or((&input, "."));
+  let escaped = regex_escape(search_term);
 
-  if base.is_empty() {
-    base = "/";
-  }
-
-  let path = Path::new(&base);
-  let dir = path.canonicalize().expect("dir err");
-  let dir = dir.to_str().unwrap();
-
-  // escape characters in the basename to be regex-safe
-  // (can be bypassed, but with chars that can't be in filnames anyway)
-  let mut escaped = regex_escape(seg);
-
-  let mut regex = if ignore_dot {
+  let regex = if options.ignore_dot {
     format!("[.]?{escaped}")
   } else {
-    escaped.clone()
+    escaped.to_string()
   };
 
-  let starts_with_seg = list_subdirs(dir, &regex)?;
+  let starts_with_search = filter_dir_list_inner(&regex, options, subdirs);
 
-  if !starts_with_seg.is_empty() {
-    return Ok(starts_with_seg);
+  if !starts_with_search.is_empty() {
+    return starts_with_search;
   }
 
-  // if first character of input ($1) is .,
-  // force starting . in the regex
-  if seg.starts_with('.') {
-    escaped = regex_escape(&seg.chars().skip(1).collect::<String>());
-    regex = format!("[.].*{escaped}");
-  } else if ignore_dot {
-    regex = format!(".*{escaped}");
+  // if first character of search_term is .,
+  // force a starting . in the regex
+  let regex = if let Some(without_prefix) = escaped.strip_prefix("[.]") {
+    format!("[.].*{without_prefix}")
+  } else if options.ignore_dot {
+    format!(".*{escaped}")
   } else {
-    regex = format!("[^.].*{escaped}");
+    format!("[^.].*{escaped}")
+  };
+
+  let substring = filter_dir_list_inner(&regex, options, subdirs);
+
+  if !substring.is_empty() {
+    return substring;
   }
 
-  list_subdirs(dir, &regex)
+  // try semi-fuzzy search as a last resort
+  let regex = regex.replace("][", "].*[");
+
+  filter_dir_list_inner(&regex, options, subdirs)
 }
 
-fn list_subdirs(base: &str, regex: &str) -> io::Result<Vec<String>> {
-  let regex = if env::var("zic_case_insensitive") == Ok("true".to_string()) {
-    format!("^(?i)({regex}.*)$")
-  } else {
-    format!("^{regex}.*$")
-  };
+fn filter_dir_list_inner(regex: &str, options: &Options, subdirs: &[String]) -> Vec<String> {
+  let regex = format!("^{regex}.*$",);
 
-  let final_regex = Regex::new(&regex).unwrap();
+  let final_regex = RegexBuilder::new(&regex)
+    .case_insensitive(options.case_insensitive)
+    .build()
+    .expect("Invalid Regex");
 
-  let mut entries = vec![];
-
-  for entry in fs::read_dir(Path::new(base)).expect("read dir error") {
-    let entry = entry?;
-
-    if let Ok(file_type) = entry.file_type() {
-      if !file_type.is_dir() {
-        continue;
-      }
-
-      let entry = entry.file_name().to_str().unwrap().to_string();
-
-      if final_regex.is_match(&entry) {
-        entries.push(entry);
-      }
-    }
-  }
-
-  entries.sort_unstable_by(|a, b| {
-    let a_dot = a.starts_with('.');
-    let b_dot = b.starts_with('.');
-
-    match (a_dot, b_dot) {
-      (true, false) => Ordering::Greater,
-      (false, true) => Ordering::Less,
-      _ => a.cmp(b),
-    }
-  });
-
-  Ok(entries)
+  subdirs
+    .iter()
+    .filter(|entry| final_regex.is_match(entry))
+    .cloned()
+    .collect::<Vec<_>>()
 }
 
 fn regex_escape(input: &str) -> String {
+  // escape characters in the basename to be regex-safe
+  // (can be bypassed, but with chars that can't be in filnames anyway)
   input
     .chars()
-    .map(|ch| {
-      if ch == '^' {
-        "\\^".to_owned()
-      } else {
-        format!("[{ch}]")
-      }
+    .map(|ch| match ch {
+      '^' => r#"[\^]"#.to_owned(),
+      '\\' => r#"[\\]"#.to_owned(),
+      '[' => r#"[\[]"#.to_owned(),
+      ']' => r#"[\]]"#.to_owned(),
+      _ => format!("[{ch}]"),
     })
     .collect()
+}
+
+#[cfg(test)]
+mod tests {
+  use std::string::ToString;
+
+  use super::*;
+
+  #[test]
+  fn test_format_result() {
+    assert_eq!(format_result("/home/", "user"), "/home/user/");
+    assert_eq!(format_result("/", "home"), "/home/");
+    assert_eq!(format_result("~/", "folder"), "~/folder/");
+    assert_eq!(format_result("~/", "folder"), "~/folder/");
+    assert_eq!(format_result("../", "folder"), "../folder/");
+    assert_eq!(format_result("/home/", "user"), "/home/user/");
+  }
+
+  #[test]
+  fn test_parse_path() {
+    assert_eq!(parse_path("/home/use"), ("/home/".into(), "use".into()));
+    assert_eq!(parse_path("/hom"), ("/".into(), "hom".into()));
+    assert_eq!(parse_path("/home/user/"), ("/home/user/".into(), "".into()));
+    assert_eq!(parse_path("/"), ("/".into(), "".into()));
+    assert_eq!(parse_path("home/use"), ("home/".into(), "use".into()));
+    assert_eq!(parse_path("home/"), ("home/".into(), "".into()));
+    assert_eq!(parse_path("home/user/"), ("home/user/".into(), "".into()));
+    assert_eq!(parse_path("home/"), ("home/".into(), "".into()));
+  }
+
+  #[test]
+  fn test_filter_dir_list() {
+    let dirs = [
+      ".etc",
+      ".home",
+      ".lib",
+      ".lib64",
+      ".MNT",
+      ".PROC",
+      "bin",
+      "boot",
+      "lost+found",
+      "root",
+      "Run",
+      "sbin",
+      "srv",
+      "sys",
+    ]
+    .into_iter()
+    .map(ToString::to_string)
+    .collect::<Vec<_>>();
+
+    let options = Options {
+      ignore_dot: false,
+      case_insensitive: false,
+    };
+
+    assert_eq!(
+      filter_dir_list("", &options, &dirs),
+      vec![
+        "bin",
+        "boot",
+        "lost+found",
+        "root",
+        "Run",
+        "sbin",
+        "srv",
+        "sys",
+      ]
+    );
+    assert_eq!(
+      filter_dir_list(".", &options, &dirs),
+      vec![".etc", ".home", ".lib", ".lib64", ".MNT", ".PROC",]
+    );
+    assert_eq!(filter_dir_list("b", &options, &dirs), vec!["bin", "boot",]);
+    assert_eq!(filter_dir_list("oo", &options, &dirs), vec!["boot", "root"]);
+    assert_eq!(filter_dir_list("in", &options, &dirs), vec!["bin", "sbin"]);
+    assert_eq!(filter_dir_list("ib", &options, &dirs), Vec::<String>::new());
+    assert_eq!(filter_dir_list("r", &options, &dirs), vec!["root"]);
+    assert_eq!(
+      filter_dir_list("mnt", &options, &dirs),
+      Vec::<String>::new()
+    );
+
+    let options = Options {
+      ignore_dot: true,
+      case_insensitive: true,
+    };
+
+    assert_eq!(
+      filter_dir_list("", &options, &dirs),
+      vec![
+        ".etc",
+        ".home",
+        ".lib",
+        ".lib64",
+        ".MNT",
+        ".PROC",
+        "bin",
+        "boot",
+        "lost+found",
+        "root",
+        "Run",
+        "sbin",
+        "srv",
+        "sys",
+      ]
+    );
+    assert_eq!(
+      filter_dir_list(".", &options, &dirs),
+      vec![".etc", ".home", ".lib", ".lib64", ".MNT", ".PROC",]
+    );
+    assert_eq!(filter_dir_list("r", &options, &dirs), vec!["root", "Run"]);
+    assert_eq!(filter_dir_list("mnt", &options, &dirs), vec![".MNT"]);
+    assert_eq!(filter_dir_list("m", &options, &dirs), vec![".MNT"]);
+    assert_eq!(
+      filter_dir_list("ib", &options, &dirs),
+      vec![".lib", ".lib64"]
+    );
+  }
 }
