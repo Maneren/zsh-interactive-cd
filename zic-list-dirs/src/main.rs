@@ -35,10 +35,12 @@ fn main() {
     "cd" => {}
     _ => abort(),
   }
+  
+  let is_env_enabled = |name| matches!(env::var(name), Ok(x) if matches!(x.as_str(), "true" | "1")); 
 
   let options = Options {
-    case_insensitive: env::var("zic_case_insensitive") == Ok("true".to_string()),
-    ignore_dot: env::var("zic_ignore_dot") == Ok("true".to_string()),
+    case_insensitive: is_env_enabled("zic_case_insensitive"),
+    ignore_dot: is_env_enabled("zic_ignore_dot"),
   };
 
   let input_path = if input_path.starts_with("~/") {
