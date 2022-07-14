@@ -4,26 +4,48 @@
 
 ![demo](demo.gif)
 
+## Usage
+
+Press TAB for completion as usual, it'll launch skim (fzf like interface). Check skim's readme for more search syntax usage.
+
 ## Installation
 
-Requires `cargo` (install via [`rustup`](https://rustup.rs/))
+Download from Gitub releases or compile with `cargo` (install that via [`rustup`](https://rustup.rs/))
 
 ### zinit
 
-Add this snippet to `.zshrc`
+1. download binary
 
 ```zsh
-zinit ice make
+zinit ice make'download'
+zinit load Maneren/zsh-interactive-cd
+```
+
+2. or compile
+
+```zsh
+zinit ice make'build'
 zinit load Maneren/zsh-interactive-cd
 ```
 
 ### Oh-my-zsh
 
-Download and compile the plugin
+Download the plugin
 
 ```sh
 git clone https://github.com/Maneren/zsh-interactive-cd $ZSH_CUSTOM/plugins/zsh-interactive-cd
-make -C $ZSH_CUSTOM/plugins/zsh-interactive-cd
+```
+
+1. download binary
+
+```sh
+make download -C $ZSH_CUSTOM/plugins/zsh-interactive-cd
+```
+
+2. or compile
+
+```sh
+make build -C $ZSH_CUSTOM/plugins/zsh-interactive-cd
 ```
 
 And add `zsh-interactive-cd` to plugins list in `.zshrc`
@@ -38,12 +60,23 @@ plugins=(
 
 ### Manually
 
-Download and compile the plugin
+Download the plugin
 
 ```sh
 cd ~/git-repos  # ...or wherever you keep your Git repos/Zsh plugins
 git clone https://github.com/Maneren/zsh-interactive-cd
-make -C zsh-interactive-cd
+```
+
+1. download binary
+
+```sh
+make download
+```
+
+2. or compile
+
+```sh
+make build
 ```
 
 And then source it from `.zshrc`
@@ -52,6 +85,3 @@ And then source it from `.zshrc`
 source ~/git-repos/zsh-interactive-cd/zsh-interactive-cd.plugin.zsh
 ```
 
-## Usage
-
-Press tab for completion as usual, it'll launch skim (fzf like interface). Check skim's readme for more search syntax usage.
