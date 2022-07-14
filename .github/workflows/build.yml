@@ -1,0 +1,40 @@
+name: Build and upload binaries to release
+
+on:
+  push:
+    tags:
+      - v[0-9]+.*
+
+jobs:
+  build-and-release:
+    name: Build and release
+    runs-on: ubuntu-latest
+    env:
+      name: zic-list-dirs
+    defaults:
+      run:
+        working-directory: ${{ env.name }}
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install target
+        run: rustup target add ${{ matrix.target }}
+      - name: Install cross-compiler
+        run: cargo install cross
+      - name: Build project
+        run: cross build --release --locked --target ${{ matrix.target }}
+      - name:
+        run: tar caf ${{ env.name }}_${{ matrix.target }}.tar.xz --directory=target/${{ matrix.target }}/release ${{ env.name }}
+      - name: Upload binary to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.name }}/${{ env.name }}_${{ matrix.target }}.tar.xz
+          asset_name: ${{ env.name }}_${{ matrix.target }}.tar.xz
+          tag: ${{ github.ref }}
+
