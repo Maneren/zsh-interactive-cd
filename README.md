@@ -8,6 +8,15 @@
 
 Press TAB for completion as usual, it'll launch skim (fzf like interface). Check skim's readme for more search syntax usage.
 
+## Configuration
+
+Set enviroment variable with given name to `1` or `true`
+
+| option | effect |
+| --- | --- |
+| `zic-case-insensitive` | ignores case |
+| `zic-ignore-dots` | includes hidden files in all searches |
+
 ## Installation
 
 Download from Gitub releases or compile with `cargo` (install that via [`rustup`](https://rustup.rs/))
@@ -21,7 +30,7 @@ zinit ice make'download'
 zinit load Maneren/zsh-interactive-cd
 ```
 
-2. or compile
+1. or compile
 
 ```zsh
 zinit ice make'build'
@@ -42,7 +51,7 @@ git clone https://github.com/Maneren/zsh-interactive-cd $ZSH_CUSTOM/plugins/zsh-
 make download -C $ZSH_CUSTOM/plugins/zsh-interactive-cd
 ```
 
-2. or compile
+1. or compile
 
 ```sh
 make build -C $ZSH_CUSTOM/plugins/zsh-interactive-cd
@@ -73,7 +82,7 @@ git clone https://github.com/Maneren/zsh-interactive-cd
 make download
 ```
 
-2. or compile
+1. or compile
 
 ```sh
 make build
@@ -84,4 +93,3 @@ And then source it from `.zshrc`
 ```zsh
 source ~/git-repos/zsh-interactive-cd/zsh-interactive-cd.plugin.zsh
 ```
-
