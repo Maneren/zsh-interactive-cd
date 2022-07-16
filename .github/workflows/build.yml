@@ -28,7 +28,7 @@ jobs:
         run: cargo install cross
       - name: Build project
         run: cross build --release --locked --target ${{ matrix.target }}
-      - name:
+      - name: Create tar.xz archive with the binary
         run: tar caf ${{ env.name }}_${{ matrix.target }}.tar.xz --directory=target/${{ matrix.target }}/release ${{ env.name }}
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v1-release
@@ -37,4 +37,3 @@ jobs:
           file: ${{ env.name }}/${{ env.name }}_${{ matrix.target }}.tar.xz
           asset_name: ${{ env.name }}_${{ matrix.target }}.tar.xz
           tag: ${{ github.ref }}
-
