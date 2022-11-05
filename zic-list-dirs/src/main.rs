@@ -2,7 +2,6 @@
 
 use std::{
   borrow::Cow,
-  cmp::Ordering,
   env, fs,
   io::{self, Cursor},
   path::Path,
@@ -35,8 +34,8 @@ fn main() {
     "cd" => {}
     _ => abort(),
   }
-  
-  let is_env_enabled = |name| matches!(env::var(name), Ok(x) if matches!(x.as_str(), "true" | "1")); 
+
+  let is_env_enabled = |name| matches!(env::var(name), Ok(x) if matches!(x.as_str(), "true" | "1"));
 
   let options = Options {
     case_insensitive: is_env_enabled("zic_case_insensitive"),
@@ -81,16 +80,8 @@ fn main() {
     _ => {
       let mut sorted = filtered;
 
-      // sort hidden files in front
-      sorted.sort_unstable_by(|a, b| {
-        let a_dot = a.starts_with('.');
-        let b_dot = b.starts_with('.');
-
-        match (a_dot, b_dot) {
-          (true, false) => Ordering::Greater,
-          (false, true) => Ordering::Less,
-          _ => a.cmp(b),
-        }
+      sorted.sort_unstable_by_key(|item| {
+        levenshtein(&search_term, item.strip_prefix('.').unwrap_or(item))
       });
 
       skim(sorted.join("\n"))
@@ -168,7 +159,6 @@ fn filter_dir_list(search_term: &str, options: &Options, subdirs: &[String]) -> 
   // constructs a regex and calls the inner function
   // which prefixes it with '^' and suffixes with '.*$'
   // $zic_case_insensitive and $zic_ignore_dot applies to the search
-
   if search_term.is_empty() {
     return if options.ignore_dot {
       subdirs.to_vec()
@@ -245,6 +235,33 @@ fn regex_escape(input: &str) -> String {
       _ => format!("[{ch}]"),
     })
     .collect()
+}
+
+fn levenshtein(a: &str, b: &str) -> usize {
+  let a_chars = a.chars().collect::<Vec<_>>();
+  let b_chars = b.chars().collect::<Vec<_>>();
+
+  // +1 for base cases - empty strings
+  let height = a_chars.len() + 1;
+  let width = b_chars.len() + 1;
+
+  let mut prev = (0..width).collect::<Vec<_>>();
+  let mut current = vec![0; width];
+
+  for i in 1..height {
+    current[0] = i;
+    for j in 1..width {
+      let m1 = prev[j - 1] + (a_chars[i - 1] != b_chars[j - 1]) as usize;
+      let m2 = prev[j] + 1; // delete
+      let m3 = current[j - 1] + 1; // insert
+
+      current[j] = m1.min(m2).min(m3);
+    }
+    prev = current;
+    current = vec![0; width];
+  }
+
+  return *prev.last().unwrap();
 }
 
 #[cfg(test)]
