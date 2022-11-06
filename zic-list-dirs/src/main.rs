@@ -238,30 +238,44 @@ fn regex_escape(input: &str) -> String {
 }
 
 fn levenshtein(a: &str, b: &str) -> usize {
-  let a_chars = a.chars().collect::<Vec<_>>();
-  let b_chars = b.chars().collect::<Vec<_>>();
-
-  // +1 for base cases - empty strings
-  let height = a_chars.len() + 1;
-  let width = b_chars.len() + 1;
-
-  let mut prev = (0..width).collect::<Vec<_>>();
-  let mut current = vec![0; width];
-
-  for i in 1..height {
-    current[0] = i;
-    for j in 1..width {
-      let m1 = prev[j - 1] + (a_chars[i - 1] != b_chars[j - 1]) as usize;
-      let m2 = prev[j] + 1; // delete
-      let m3 = current[j - 1] + 1; // insert
-
-      current[j] = m1.min(m2).min(m3);
-    }
-    prev = current;
-    current = vec![0; width];
+  if a == b {
+    return 0;
   }
 
-  return *prev.last().unwrap();
+  // use chars::count to prevent weird unicode issues
+  let a_len = a.chars().count();
+  let b_len = b.chars().count();
+
+  if a.is_empty() {
+    return b_len;
+  }
+
+  if b.is_empty() {
+    return a_len;
+  }
+
+  // [..j] = previous line, [j..] current line
+  let mut cache = (1..=b_len).collect::<Vec<_>>();
+
+  let mut result = 0; // left field
+
+  for (i, a) in a.chars().enumerate() {
+    let mut base_dist = i; // diagonal field
+
+    for (j, b) in b.chars().enumerate() {
+      let m1 = base_dist + (a != b) as usize; // substitute (diagonal)
+      let m2 = cache[j] + 1; // delete (up)
+      let m3 = result + 1; // insert (left)
+
+      base_dist = cache[j]; // up moves to diagonal
+
+      cache[j] = m1.min(m2).min(m3); // store current field
+
+      result = cache[j]; // current moves to left
+    }
+  }
+
+  result
 }
 
 #[cfg(test)]
