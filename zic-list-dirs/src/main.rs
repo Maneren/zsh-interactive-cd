@@ -236,7 +236,12 @@ fn regex_escape(input: &str) -> String {
     .collect()
 }
 
+// optimized levenshtein distance algorithm
+//
+// stores only one row, filed to left and field to top
+// skips first column as it follows a simple ascending sequence
 fn levenshtein(a: &str, b: &str) -> usize {
+  // short circuit if equal
   if a == b {
     return 0;
   }
@@ -245,36 +250,39 @@ fn levenshtein(a: &str, b: &str) -> usize {
   let a_len = a.chars().count();
   let b_len = b.chars().count();
 
+  // short circuit if empty
   if a.is_empty() {
     return b_len;
   }
-
   if b.is_empty() {
     return a_len;
   }
 
-  // [..j] = previous line, [j..] current line
+  // the loop reads a field from here (previous row)
+  // and then sets the field to the current row's value
+
+  // initialize as first row - ascending numbers
   let mut cache = (1..=b_len).collect::<Vec<_>>();
 
-  let mut result = 0; // left field
+  let mut left = 0;
 
   for (i, a) in a.chars().enumerate() {
-    let mut base_dist = i; // diagonal field
+    let mut diagonal = i; // first column == 0..=b_len
 
     for (j, b) in b.chars().enumerate() {
-      let m1 = base_dist + usize::from(a != b); // substitute (diagonal)
-      let m2 = cache[j] + 1; // delete (up)
-      let m3 = result + 1; // insert (left)
+      let m1 = diagonal + usize::from(a != b); // substitute
+      let m2 = cache[j] + 1; // delete
+      let m3 = left + 1; // insert
 
-      base_dist = cache[j]; // up moves to diagonal
+      diagonal = cache[j]; // cache[j] = up
 
-      cache[j] = m1.min(m2).min(m3); // store current field
+      cache[j] = m1.min(m2).min(m3); // store best option
 
-      result = cache[j]; // current moves to left
+      left = cache[j]; // cache[j] = current
     }
   }
 
-  result
+  left
 }
 
 #[cfg(test)]
