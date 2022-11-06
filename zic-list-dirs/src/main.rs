@@ -56,8 +56,7 @@ fn main() {
     base_path
   };
 
-  let path = Path::new(&base_path);
-  let base_path = path
+  let base_path = Path::new(&base_path)
     .canonicalize()
     .unwrap_or_else(|_| abort())
     .to_string_lossy()
@@ -103,7 +102,7 @@ fn parse_path(input_path: &str) -> (String, String) {
   if let Some((base, search)) = input_path.rsplit_once('/') {
     (format!("{base}/"), search.into())
   } else {
-    ("".into(), input_path.into())
+    (String::new(), input_path.into())
   }
 }
 
@@ -263,7 +262,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
     let mut base_dist = i; // diagonal field
 
     for (j, b) in b.chars().enumerate() {
-      let m1 = base_dist + (a != b) as usize; // substitute (diagonal)
+      let m1 = base_dist + usize::from(a != b); // substitute (diagonal)
       let m2 = cache[j] + 1; // delete (up)
       let m3 = result + 1; // insert (left)
 
@@ -298,12 +297,18 @@ mod tests {
   fn test_parse_path() {
     assert_eq!(parse_path("/home/use"), ("/home/".into(), "use".into()));
     assert_eq!(parse_path("/hom"), ("/".into(), "hom".into()));
-    assert_eq!(parse_path("/home/user/"), ("/home/user/".into(), "".into()));
-    assert_eq!(parse_path("/"), ("/".into(), "".into()));
+    assert_eq!(
+      parse_path("/home/user/"),
+      ("/home/user/".into(), String::new())
+    );
+    assert_eq!(parse_path("/"), ("/".into(), String::new()));
     assert_eq!(parse_path("home/use"), ("home/".into(), "use".into()));
-    assert_eq!(parse_path("home/"), ("home/".into(), "".into()));
-    assert_eq!(parse_path("home/user/"), ("home/user/".into(), "".into()));
-    assert_eq!(parse_path("home/"), ("home/".into(), "".into()));
+    assert_eq!(parse_path("home/"), ("home/".into(), String::new()));
+    assert_eq!(
+      parse_path("home/user/"),
+      ("home/user/".into(), String::new())
+    );
+    assert_eq!(parse_path("home/"), ("home/".into(), String::new()));
   }
 
   #[test]
