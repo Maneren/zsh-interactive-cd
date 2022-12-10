@@ -79,7 +79,7 @@ fn main() {
     _ => {
       let mut sorted = filtered;
 
-      sorted.sort_unstable_by_key(|item| {
+      sorted.sort_by_cached_key(|item| {
         levenshtein(&search_term, item.strip_prefix('.').unwrap_or(item))
       });
 
@@ -200,10 +200,16 @@ fn filter_dir_list(search_term: &str, options: &Options, subdirs: &[String]) -> 
     return substring;
   }
 
-  // try semi-fuzzy search as a last resort
+  // semi-fuzzy search
   let regex = regex.replace("][", "].*[");
 
-  filter_dir_list_inner(&regex, options, subdirs)
+  let semi = filter_dir_list_inner(&regex, options, subdirs);
+
+  if !semi.is_empty() {
+    return semi;
+  }
+
+  subdirs.to_vec()
 }
 
 fn filter_dir_list_inner(regex: &str, options: &Options, subdirs: &[String]) -> Vec<String> {
