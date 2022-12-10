@@ -36,6 +36,10 @@ function zic-completion() {
         return
     fi
 
+    if [ "$LBUFFER" = "$output" ]; then
+        return
+    fi
+
     LBUFFER="${output}"
 
     zle redisplay
