@@ -4,8 +4,8 @@ version = "1.1.0"
 edition = "2021"
 
 [dependencies]
-regex = "1.5.6"
-skim = "0.9.4"
+regex = "1.7.0"
+skim = "0.10.2"
 shell-escape = "0.1.5"
 
 [profile.release]
