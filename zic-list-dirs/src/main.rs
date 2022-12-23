@@ -38,18 +38,16 @@ fn main() {
   };
 
   let input_path = if input_path.starts_with("~/") {
-    input_path.replace('~', &env::var("HOME").unwrap_or_default())
+    input_path.replace('~', &env::var("HOME").expect("$HOME should be defined"))
   } else {
     input_path.to_string()
   };
 
-  let (base_path, search_term) = parse_path(&input_path);
+  let (mut base_path, search_term) = parse_path(&input_path);
 
-  let base_path = if base_path.is_empty() {
-    ".".into()
-  } else {
-    base_path
-  };
+  if base_path.is_empty() {
+    base_path = ".".into();
+  }
 
   let base_path = Path::new(&base_path)
     .canonicalize()
