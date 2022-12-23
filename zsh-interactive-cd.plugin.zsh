@@ -6,7 +6,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-PATH="$PATH:${0:a:h}/bin"
+__zic_bin_path="${0:a:h}/bin"
+if [[ "$PATH" != *"$__zic_bin_path"* ]]; then
+    PATH="$PATH:$__zic_bin_path"
+fi
+unset __zic_bin_path
 
 if ! which zic-list-dirs 2>&1 >/dev/null; then
     echo "zsh-interactive-cd: Binary not found" >&2
