@@ -129,7 +129,7 @@ fn get_subdirs(path: &String) -> io::Result<Vec<String>> {
 fn format_result(base: &str, result: &str) -> String {
   let result = escape(Cow::Borrowed(result)).to_string();
 
-  format!("{}{}/", base, result) // base always ends with '/'
+  format!("{base}{result}/") // base always ends with '/'
 }
 
 fn skim(input: String) -> Option<String> {
