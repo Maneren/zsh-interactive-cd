@@ -27,13 +27,8 @@ fn main() {
   let lbuffer = args.next().unwrap_or_default();
   let lbuffer_expanded = args.next().unwrap_or_default();
 
-  let (command, input) = lbuffer.split_once(' ').unwrap_or_default();
+  let (_, input) = lbuffer.split_once(' ').unwrap_or_default();
   let (_, input_path) = lbuffer_expanded.split_once(' ').unwrap_or_default();
-
-  match command {
-    "cd" => {}
-    _ => abort(),
-  }
 
   let is_env_enabled = |name| matches!(env::var(name), Ok(x) if matches!(x.as_str(), "true" | "1"));
 

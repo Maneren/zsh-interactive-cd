@@ -28,6 +28,11 @@ if [ -z $__zic_default_completion ]; then
 fi
 
 function zic-completion() {
+    if [[ "$LBUFFER" != "cd "* ]]; then
+        zle $__zic_default_completion
+        return
+    fi
+
     local output
     output=$(zic-list-dirs "$LBUFFER" "${(e)LBUFFER}") # second argument is with expanded variables
 
