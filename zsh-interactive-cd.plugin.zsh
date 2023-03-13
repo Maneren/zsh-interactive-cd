@@ -32,10 +32,10 @@ zic-setup() {
         )
     fi
 
-    bindkey $shortcut zic-completion
+    bindkey $shortcut __zic-completion
 }
 
-function zic-completion() {
+function __zic-completion() {
     if [[ "$LBUFFER" != "cd "* ]]; then
         zle $__zic_default_completion
         return
@@ -59,4 +59,4 @@ function zic-completion() {
     typeset -f zle-line-init >/dev/null && zle zle-line-init
 }
 
-zle -N zic-completion
+zle -N __zic-completion
