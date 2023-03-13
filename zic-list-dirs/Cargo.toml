@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 regex = "1.7.1"
-skim = "0.10.2"
+skim = "0.10.4"
 shell-escape = "0.1.5"
 
 [profile.release]
