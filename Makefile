@@ -5,9 +5,9 @@ build:
 	rm -rf ./zic-list-dirs/target
 
 dev:
-	cargo build --manifest-path=zic-list-dirs/Cargo.toml --release
+	cargo build --manifest-path=zic-list-dirs/Cargo.toml
 	mkdir -p ./bin
-	mv ./zic-list-dirs/target/release/zic-list-dirs ./bin/
+	mv ./zic-list-dirs/target/debug/zic-list-dirs ./bin/
 
 download: REPO:=https://github.com/Maneren/zsh-interactive-cd
 download: LATEST_VERSION:=$(shell git ls-remote --refs --sort="version:refname" --tags 2>/dev/null | cut -d/ -f3- | tail -n1)
