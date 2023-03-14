@@ -27,10 +27,14 @@ fn main() {
   let lbuffer = args.next().unwrap_or_default();
   let lbuffer_expanded = args.next().unwrap_or_default();
 
-  let (_, input) = lbuffer.split_once(' ').unwrap_or_default();
-  let (_, input_path) = lbuffer_expanded.split_once(' ').unwrap_or_default();
+  let input = lbuffer
+    .strip_prefix("cd ")
+    .expect(r#"Input should start with "cd ""#);
+  let input_path = lbuffer_expanded
+    .strip_prefix("cd ")
+    .expect(r#"Expanded input should start with "cd ""#);
 
-  let is_env_enabled = |name| matches!(env::var(name), Ok(x) if matches!(x.as_str(), "true" | "1"));
+  let is_env_enabled = |name| matches!(env::var(name), Ok(x) if x == "true" || x == "1");
 
   let options = Options {
     case_insensitive: is_env_enabled("zic_case_insensitive"),
@@ -49,16 +53,9 @@ fn main() {
     base_path = ".".into();
   }
 
-  let base_path = Path::new(&base_path)
-    .canonicalize()
-    .unwrap_or_else(|_| abort())
-    .to_string_lossy()
-    .to_string();
+  let Ok(base_path) = Path::new(&base_path).canonicalize() else { abort() };
 
-  let subdirs = match get_subdirs(&base_path) {
-    Ok(entries) => entries,
-    _ => abort(),
-  };
+  let Ok(subdirs) = get_subdirs(&base_path) else { abort() };
 
   let filtered = filter_dir_list(&search_term, &options, &subdirs);
 
@@ -104,23 +101,21 @@ fn exit() -> ! {
 }
 
 fn abort() -> ! {
-  process::exit(1);
+  process::exit(1); // error encountered, fall back to default handling in the main script
 }
 
-fn get_subdirs(path: &String) -> io::Result<Vec<String>> {
-  let mut subdirs = Vec::new();
-  for entry in fs::read_dir(Path::new(path))? {
-    let entry = entry?;
-    let path = entry.path();
-    if path.is_dir() {
-      subdirs.push(path.file_name().unwrap().to_string_lossy().to_string());
-    }
-  }
-  Ok(subdirs)
+fn get_subdirs(path: &Path) -> io::Result<Vec<String>> {
+  Ok(
+    fs::read_dir(path)?
+      .filter_map(Result::ok)
+      .filter(|entry| entry.path().is_dir())
+      .map(|entry| entry.file_name().to_string_lossy().to_string())
+      .collect(),
+  )
 }
 
 fn format_result(base: &str, result: &str) -> String {
-  let result = escape(Cow::Borrowed(result)).to_string();
+  let result = escape(Cow::Borrowed(result));
 
   format!("{base}{result}/") // base always ends with '/'
 }
