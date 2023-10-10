@@ -17,21 +17,25 @@ if ! which zic-list-dirs 2>&1 >/dev/null; then
     return 1
 fi
 
-[ -z $zic_custom_binding ] && zic_custom_binding='^I' # default is TAB
+zic-setup() {
+    local shortcut="$1"
 
-if [ -z $__zic_default_completion ]; then
-    __binding=$(bindkey $zic_custom_binding)
+    [ -z $shortcut ] && shortcut='^I' # default is TAB
 
-    # if the key isn't bound to anything use ZSH's default completion
-    # else use the set completion
-    __zic_default_completion=$(
-        [ $__binding = 'undefined-key' ] && echo "expand-or-complete" || echo $__binding[(s: :w)2]
-    )
+    if [ -z $__zic_default_completion ]; then
+        local binding=$(bindkey $shortcut)
 
-    unset __binding
-fi
+        # if the key isn't bound to anything use ZSH's default completion
+        # else use the set completion
+        __zic_default_completion=$(
+            [ $binding = 'undefined-key' ] && echo "expand-or-complete" || echo $binding[(s: :w)2]
+        )
+    fi
 
-function zic-completion() {
+    bindkey $shortcut __zic-completion
+}
+
+function __zic-completion() {
     if [[ "$LBUFFER" != "cd "* ]]; then
         zle $__zic_default_completion
         return
@@ -55,5 +59,4 @@ function zic-completion() {
     typeset -f zle-line-init >/dev/null && zle zle-line-init
 }
 
-zle -N zic-completion
-bindkey $zic_custom_binding zic-completion
+zle -N __zic-completion
