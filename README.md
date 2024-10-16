@@ -1,5 +1,8 @@
 # zsh-interactive-cd
 
+> [!warning]
+> This plugin is no longer maintained. I switched to [`zoxide`](https://github.com/ajeetdsouza/zoxide).
+
 ## Demo
 
 ![demo](demo.gif)
